@@ -56,6 +56,18 @@ export const problems = problemNames.map(p => {
 	}
 })
 
+export function getVarsFromOpt(opt) {
+	const optSegments = opt.split(" ")
+	const vars = parseInt(optSegments[0].slice(6))
+	return vars
+}
+
+export function getObjsFromOpt(opt) {
+	const optSegments = opt.split(" ")
+	const objs = parseInt(optSegments[1].slice(7))
+	return objs
+}
+
 export function getAvailAlgorithms({ problemName, problemOpt }) {
 	const optSegments = problemOpt.split(" ")
 	const vars = (optSegments[0].slice(6))

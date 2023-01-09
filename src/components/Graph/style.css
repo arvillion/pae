@@ -28,7 +28,6 @@ g.scatters .row g:last-of-type .axis-y text{
 }
 
 g.parallel-cord path.line {
-	stroke: black;
 	stroke-width: .5;
 	fill: none;
 	opacity: .4;

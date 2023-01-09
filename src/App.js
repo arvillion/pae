@@ -1,9 +1,10 @@
 import { Button, Cascader, Select } from 'antd'
 import { useEffect, useRef, useState } from 'react';
 import Graph from './components/Graph';
-import { getAvailAlgorithms, getFileName, problems } from './utils/data';
+import { getAvailAlgorithms, getFileName, getObjsFromOpt, problems } from './utils/data';
 import { dataLoader } from './utils/dataLoader';
 import { v4 as uuidv4 } from 'uuid';
+import { timer } from 'd3';
 
 const cascaderOptions = problems.map(p => ({
   value: p.problem,
@@ -22,15 +23,20 @@ function App() {
   const [loading, setLoading] = useState(false)
 
 
-  const newTimer = ({dataGen, timerRef, interval = 100}) => setInterval(() => {
-    dataGen.next().then(({ value }) => {
-      if (value) setData(value)
-      else {
-        clearInterval(timerRef.current)
-        setFinished(true)
-      }
-    })
-  }, interval)
+  const newTimer = ({groupId, dataGen, interval = 200}) => {
+    const timer = setInterval(() => {
+      dataGen.next().then(({ value }) => {
+        if (value) setData(previousData => ({
+          ...previousData,
+          [groupId]: value
+        }))
+        else {
+          clearInterval(timer)
+        }
+      })
+    }, interval)
+    return timer
+  }
 
   useEffect(() => {
     const algorithms = getAvailAlgorithms({
@@ -48,39 +54,50 @@ function App() {
   const [finished, setFinished] = useState(false)
   const [dataSourceId, setDataSourceId] = useState(uuidv4())
 
-  const timer = useRef()
+  const timers = useRef([])
+
+  const clearAllTimer = () => {
+    timers.current.forEach(timer => clearInterval(timer))
+    timers.current = []
+  }
 
   const handleStart = () => {
-    const dG = dataLoader( 'data/' + getFileName({
-      problemName: currProblem[0],
-      problemOpt: currProblem[1],
-      algorithm: currAlgorithms[0]
-    }) )
-    setDataGen(dG)
+    const dGs = currAlgorithms.map(al => ({
+      groupId: al.replaceAll(' ', '-').replaceAll('=', '--'),
+      loader: dataLoader( 'data/' + getFileName({
+        problemName: currProblem[0],
+        problemOpt: currProblem[1],
+        algorithm: al
+      }))
+    }))
+    setData({})
+    setDataGen(dGs)
     setPaused(false)
     setFinished(false)
     setDataSourceId(uuidv4())
-    clearInterval(timer.current)
-    timer.current = newTimer({
-      dataGen: dG,
-      timerRef: timer
+    clearAllTimer()
+
+    dGs.forEach(dG => {
+      timers.current.push(newTimer({
+        dataGen: dG.loader,
+        groupId: dG.groupId,
+      }))
     })
   }
 
   const handlePause = () => {
     setPaused(true)
-    clearInterval(timer.current)
-    timer.current = null
+    clearAllTimer(timers.current)
   }
 
   const handleContinue = () => {
     setPaused(false)
-    if (!timer.current && dataGen) {
-      timer.current = newTimer({
-        dataGen,
-        timerRef: timer
-      })
-    }  
+    dataGen.forEach(dG => {
+      timers.current.push(newTimer({
+        dataGen: dG.loader,
+        groupId: dG.groupId,
+      }))
+    })
   }
 
 
@@ -95,6 +112,7 @@ function App() {
         setCurrProblem(v)
         setCurrAlgorithms([])
       }}
+      allowClear={false}
     />
 
     <Select
@@ -109,8 +127,10 @@ function App() {
     {!finished && (paused ? <Button onClick={handleContinue}>Continue</Button>
                           : <Button onClick={handlePause}>Pause</Button>)}
     {data && <Graph 
-      data={data}
       dataSourceId={dataSourceId}
+      propNum={getObjsFromOpt(currProblem[1])}
+      data={data}
+      groupIds={dataGen.map(g => g.groupId)}
     />}
   </>;
 }
